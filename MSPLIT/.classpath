@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry excluding="PeakComparatorSet.java|org/systemsbiology/jrap/stax/|IO/MZMLReader.java" kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/commons-collections-3.2.1.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/MS_Java/msgfdb/extlib/jrap_StAX_v5.2.jar"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/JmzReader"/>
+	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" exported="true" kind="src" path="/JmzReader"/>
+	<classpathentry exported="true" kind="lib" path="/Users/wrtz/msplit_dia_dependencies/external_lib/commons-collections-3.2.1"/>
+	<classpathentry exported="true" kind="lib" path="/Users/wrtz/msplit_github_source/workspace-master/MS_Java/msgfdb/extlib/jrap_StAX_v5.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/wrtz/Documents/eclipse_workspace3/JmzReader"/>
+	<classpathentry kind="lib" path="/Users/wrtz/Desktop/misc/MzTabUtils/org"/>
+	<classpathentry kind="lib" path="/Users/wrtz/Desktop/misc/MzTabUtils.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/msplit_dia_dependencies/uk.ac.ebi.pride.tools"/>
+	<classpathentry kind="lib" path="/Users/wrtz/msplit_dia_dependencies/mzml-wrapper-1.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
