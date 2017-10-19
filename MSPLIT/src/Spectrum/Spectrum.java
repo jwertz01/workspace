@@ -10,10 +10,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -88,7 +90,7 @@ public class Spectrum
     return new Spectrum();
   }
   
-  public Spectrum(Spectrum s1, Spectrum s2, double scale1, double scale2)
+  public Spectrum(Spectrum s1, Spectrum s2, double scale1, double scale2, double tolerance)
   {
     s1 = s1.toNormVector(BINWIDTH, MINMASS, MAXMASS);
     s2 = s2.toNormVector(BINWIDTH, MINMASS, MAXMASS);
@@ -102,6 +104,7 @@ public class Spectrum
     
     this.modMass = (this.parentMass - Math.min(s1.parentMass, s2.parentMass));
     
+
     int i = 0;int j = 0;
     do
     {
@@ -109,16 +112,16 @@ public class Spectrum
       Peak p2 = (Peak)s2.peaks.get(j);
       double mz1 = p1.getMass();
       double mz2 = p2.getMass();
-      if (mz1 < mz2)
-      {
-        this.peaks.add(new Peak(mz1, p1.getIntensity() * scale1));
-        i++;
-      }
-      else if (mz1 == mz2)
+      if (Math.abs(mz1 - mz2) <= tolerance)
       {
         this.peaks.add(new Peak(mz1, p1.getIntensity() * scale1 + p2.getIntensity() * scale2));
         i++;
         j++;
+      }
+      else if (mz1 < mz2)
+      {
+        this.peaks.add(new Peak(mz1, p1.getIntensity() * scale1));
+        i++;
       }
       else
       {
@@ -143,7 +146,7 @@ public class Spectrum
     }
   }
   
-  public Spectrum(Spectrum s1, Spectrum s2, double scale1, double scale2, boolean toVector)
+  public Spectrum(Spectrum s1, Spectrum s2, double scale1, double scale2, boolean toVector, double tolerance)
   {
     if (toVector)
     {
@@ -177,13 +180,7 @@ public class Spectrum
       Peak p2 = (Peak)s2.peaks.get(j);
       double mz1 = p1.getMass();
       double mz2 = p2.getMass();
-      if (mz1 < mz2)
-      {
-        this.peaks.add(new Peak(mz1, p1.getIntensity() * scale1));
-        ((Peak)this.peaks.get(this.peaks.size() - 1)).copyRank(p1);
-        i++;
-      }
-      else if (mz1 == mz2)
+      if (Math.abs(mz1 - mz2) < tolerance)
       {
         this.peaks.add(new Peak(mz1, p1.getIntensity() * scale1 + p2.getIntensity() * scale2));
         if (p1.getIntensity() > p2.getIntensity()) {
@@ -194,6 +191,12 @@ public class Spectrum
         commonpeak++;
         i++;
         j++;
+      }
+      else if (mz1 < mz2)
+      {
+        this.peaks.add(new Peak(mz1, p1.getIntensity() * scale1));
+        ((Peak)this.peaks.get(this.peaks.size() - 1)).copyRank(p1);
+        i++;
       }
       else
       {
@@ -221,9 +224,9 @@ public class Spectrum
     }
   }
   
-  public Spectrum(Spectrum s1, Spectrum s2, double scale1, double scale2, boolean toVector, boolean merge)
+  public Spectrum(Spectrum s1, Spectrum s2, double scale1, double scale2, boolean toVector, boolean merge, double tolerance)
   {
-    this(s1, s2, scale1, scale2, toVector);
+    this(s1, s2, scale1, scale2, toVector, tolerance);
     if (merge) {
       mergePeaks(this, 0.25D);
     }
@@ -282,9 +285,9 @@ public class Spectrum
     System.out.println("after merging we have " + mix.peaks.size());
   }
   
-  public Spectrum(Spectrum s1, Spectrum s2)
+  public Spectrum(Spectrum s1, Spectrum s2, double tolerance)
   {
-    this(s1, s2, 1.0D, 1.0D);
+    this(s1, s2, 1.0D, 1.0D, tolerance);
   }
   
   public void setPeaks(List<Peak> peaks)
@@ -633,29 +636,15 @@ public class Spectrum
   
   public Spectrum toVector(double binWidth, double minMass, double maxMass)
   {
-    int bins = (int)((maxMass - minMass) / binWidth) + 1;
     Vector<Peak> newPeaks = new Vector();
-    double rightBoundary = minMass + binWidth;
-    
-    int j = 0;
     int i = 0;
-    for (i = 0; i < bins; i++)
-    {
-      rightBoundary = minMass + i * binWidth;
-      double currentValue = 0.0D;
-      while (j < this.peaks.size())
-      {
-        double moz = ((Peak)this.peaks.get(j)).getMass();
-        if (moz > rightBoundary) {
-          break;
-        }
-        currentValue += ((Peak)this.peaks.get(j)).getIntensity();
-        j++;
-      }
-      if (currentValue > 0.0D) {
-        newPeaks.add(new Peak(minMass + i * binWidth - binWidth / 2.0D, currentValue));
-      }
+    while (i < this.peaks.size()) {
+        double mz = ((Peak)this.peaks.get(i)).getMass();
+        double intensity = ((Peak)this.peaks.get(i)).getIntensity();
+        newPeaks.add(new Peak(mz, intensity));
+        i++;
     }
+
     Spectrum ret = new Spectrum(newPeaks, this.peptide, this.parentMass, this.charge, 
       this.modMass, this.modPos);
     ret.scanNumber = this.scanNumber;
@@ -780,101 +769,96 @@ public class Spectrum
     }
   }
   
-  public double cosineSim(Spectrum s1)
-  {
-    double product = 0.0D;
-    double magnitude = magnitude();
-    magnitude *= s1.magnitude();
-    
-    int i = 0;int j = 0;
-    while ((i < this.peaks.size()) && (j < s1.peaks.size()))
-    {
-      double mz1 = ((Peak)this.peaks.get(i)).getMass();
-      double mz2 = ((Peak)s1.peaks.get(j)).getMass();
-      if (mz1 < mz2)
-      {
-        i++;
-      }
-      else if (mz1 == mz2)
-      {
-        product = product + ((Peak)this.peaks.get(i)).getIntensity() * ((Peak)s1.peaks.get(j)).getIntensity();
-        i++;
-        j++;
-      }
-      else
-      {
-        j++;
-      }
-    }
-    return product / magnitude;
-  }
-  
   public double cosine(Spectrum s1)
   {
     return 0.0D;
   }
-  
-  public double cosineSim2(Spectrum s1)
+
+  public double cosineSim1(Spectrum s1, double tolerance)
   {
-    double product = 0.0D;
-    double magnitude = magnitude();
-    
-    magnitude *= s1.magnitude();
-    
-    int i = 0;int j = 0;
-    while ((i < this.peaks.size()) && (j < s1.peaks.size()))
-    {
-      double mz1 = ((Peak)this.peaks.get(i)).getMass();
-      double mz2 = ((Peak)s1.peaks.get(j)).getMass();
-      if (mz1 < mz2)
-      {
-        i++;
+      if (s1.peaks.size() == 0 || this.peaks.size() == 0) {
+          return 0.0;
       }
-      else if (mz1 == mz2)
-      {
-        product = product + Math.pow(((Peak)this.peaks.get(i)).getIntensity(), 2.0D) * Math.pow(((Peak)s1.peaks.get(j)).getIntensity(), 2.0D);
-        i++;
-        j++;
+      double magnitude = this.sumOfPeaks();
+      magnitude *= s1.sumOfPeaks();
+      double shift = this.parentMass - s1.parentMass;
+      Set<List<Integer>> zeroShiftAlignments = this.findMatchPeaks(s1, 0, tolerance);
+      Set<List<Integer>> realShiftAlignments;
+      if (Math.abs(shift) > tolerance) {
+          //realShiftAlignments = this.findMatchPeaks(s1, shift, tolerance); 
       }
-      else
-      {
-        j++;
+      else {
+          realShiftAlignments = new HashSet<List<Integer>>();
       }
-    }
-    return Math.pow(product, 0.5D) / magnitude;
+      HashMap<Double, Set<List<Integer>>> pairsPerScore = new HashMap<Double, Set<List<Integer>>>();
+      updatePairsPerScoreMap2(pairsPerScore, zeroShiftAlignments, s1);
+      //updatePairsPerScoreMap2(pairsPerScore, realShiftAlignments, s1);
+      ArrayList allScoresSorted = new ArrayList(new TreeSet(pairsPerScore.keySet()));
+      Collections.reverse(allScoresSorted);
+      Set<Integer> spec0PeakUsed = new HashSet<Integer>();
+      Set<Integer> spec1PeakUsed = new HashSet<Integer>();
+      double totalScore = 0.0;
+      for (int i = 0; i < allScoresSorted.size(); i++) {
+          double score = (double) allScoresSorted.get(i);
+          Set<List<Integer>> scorePairs = pairsPerScore.get(score);
+          Iterator<List<Integer>> it = scorePairs.iterator();
+          while (it.hasNext()) {
+              List<Integer> pair = it.next();
+              int i0 = pair.get(0);
+              int i1 = pair.get(1);
+              if (!spec0PeakUsed.contains(i0) && !spec1PeakUsed.contains(i1)) {
+                  spec0PeakUsed.add(i0);
+                  spec1PeakUsed.add(i1);
+                  totalScore += score;
+              }
+          }
+      }
+      return totalScore / magnitude;
+  }  
+  
+  public double cosineSim2(Spectrum s1, double tolerance)
+  {
+      if (s1.peaks.size() == 0 || this.peaks.size() == 0) {
+          return 0.0;
+      }
+      double magnitude = this.magnitude();
+      magnitude *= s1.magnitude();
+      double shift = this.parentMass - s1.parentMass;
+      Set<List<Integer>> zeroShiftAlignments = this.findMatchPeaks(s1, 0, tolerance);
+      Set<List<Integer>> realShiftAlignments;
+      if (Math.abs(shift) > tolerance) {
+          //realShiftAlignments = this.findMatchPeaks(s1, shift, tolerance); 
+      }
+      else {
+          realShiftAlignments = new HashSet<List<Integer>>();
+      }
+      HashMap<Double, Set<List<Integer>>> pairsPerScore = new HashMap<Double, Set<List<Integer>>>();
+      updatePairsPerScoreMap2(pairsPerScore, zeroShiftAlignments, s1);
+      //updatePairsPerScoreMap2(pairsPerScore, realShiftAlignments, s1);
+      ArrayList allScoresSorted = new ArrayList(new TreeSet(pairsPerScore.keySet()));
+      Collections.reverse(allScoresSorted);
+      Set<Integer> spec0PeakUsed = new HashSet<Integer>();
+      Set<Integer> spec1PeakUsed = new HashSet<Integer>();
+      double totalScore = 0.0;
+      for (int i = 0; i < allScoresSorted.size(); i++) {
+          double score = (double) allScoresSorted.get(i);
+          Set<List<Integer>> scorePairs = pairsPerScore.get(score);
+          Iterator<List<Integer>> it = scorePairs.iterator();
+          while (it.hasNext()) {
+              List<Integer> pair = it.next();
+              int i0 = pair.get(0);
+              int i1 = pair.get(1);
+              if (!spec0PeakUsed.contains(i0) && !spec1PeakUsed.contains(i1)) {
+                  spec0PeakUsed.add(i0);
+                  spec1PeakUsed.add(i1);
+                  totalScore += score;
+              }
+          }
+      }
+      return Math.pow(totalScore, .5) / magnitude;
   }
   
-  public double cosineSim1(Spectrum s1)
-  {
-    double product = 0.0D;
-    double magnitude = sumOfPeaks();
-    
-    magnitude *= s1.sumOfPeaks();
-    
-    int i = 0;int j = 0;
-    while ((i < this.peaks.size()) && (j < s1.peaks.size()))
-    {
-      double mz1 = ((Peak)this.peaks.get(i)).getMass();
-      double mz2 = ((Peak)s1.peaks.get(j)).getMass();
-      if (mz1 < mz2)
-      {
-        i++;
-      }
-      else if (mz1 == mz2)
-      {
-        product = product + Math.pow(((Peak)this.peaks.get(i)).getIntensity(), 0.5D) * Math.pow(((Peak)s1.peaks.get(j)).getIntensity(), 0.5D);
-        i++;
-        j++;
-      }
-      else
-      {
-        j++;
-      }
-    }
-    return product / magnitude;
-  }
-  
-  public double shiftCosineSim(Spectrum s1)
+  public double shiftCosineSim(Spectrum s1, double fragmentTolerance)
   {
     Spectrum original = toNormVector();
     shiftSpectrum(0.5D);
@@ -883,126 +867,165 @@ public class Spectrum
     Spectrum leftShift = toNormVector();
     shiftSpectrum(0.5D);
     Spectrum vS1 = s1.toNormVector();
-    double cosineOriginal = original.cosineSim(vS1);
-    double cosineLeftShift = leftShift.cosineSim(vS1);
-    double cosineRightShift = rightShift.cosineSim(vS1);
+    double cosineOriginal = original.cosineSim(vS1, fragmentTolerance);
+    double cosineLeftShift = leftShift.cosineSim(vS1, fragmentTolerance);
+    double cosineRightShift = rightShift.cosineSim(vS1, fragmentTolerance);
     
     return Math.max(cosineRightShift, 
       Math.max(cosineOriginal, cosineLeftShift));
   }
   
-  public double shareSim(Spectrum s1)
+  public double shareSim(Spectrum s1, double fragmentTolerance)
   {
-    double s = shareSim(s1, 0);
+    double s = shareSim(s1, 0, fragmentTolerance);
     return s;
   }
   
-  public double shareSim(Spectrum s1, int mode)
+  public double shareSim(Spectrum s1, int mode, double tolerance)
   {
-    double product = 0.0D;
-    double magnitude = this.peaks.size();
-    double magnitude2 = s1.peaks.size();
-    
-    int i = 0;int j = 0;
-    while ((i < this.peaks.size()) && (j < s1.peaks.size()))
-    {
-      double mz1 = ((Peak)this.peaks.get(i)).getMass();
-      double mz2 = ((Peak)s1.peaks.get(j)).getMass();
-      if (mz1 < mz2)
-      {
-        i++;
+      if (s1.peaks.size() == 0 || this.peaks.size() == 0) {
+          return 0.0;
       }
-      else if (mz1 == mz2)
-      {
-        product += 1.0D;
-        i++;
-        j++;
+      double product = 0;
+      double magnitude = this.peaks.size();
+      double magnitude2 = s1.peaks.size();
+      double shift = this.parentMass - s1.parentMass;
+      Set<List<Integer>> zeroShiftAlignments = this.findMatchPeaks(s1, 0, tolerance);
+      Set<List<Integer>> realShiftAlignments;
+      if (Math.abs(shift) > tolerance) {
+          //realShiftAlignments = this.findMatchPeaks(s1, shift, tolerance); 
       }
-      else
-      {
-        j++;
+      else {
+          realShiftAlignments = new HashSet<List<Integer>>();
       }
-    }
-    if (mode == 0) {
-      return product / ((magnitude + magnitude2) / 2.0D);
-    }
-    if (mode == 1) {
-      return product / magnitude;
-    }
-    return product / magnitude2;
+      HashMap<Double, Set<List<Integer>>> pairsPerScore = new HashMap<Double, Set<List<Integer>>>();
+      updatePairsPerScoreMap(pairsPerScore, zeroShiftAlignments, s1);
+      //updatePairsPerScoreMap(pairsPerScore, realShiftAlignments, s1);
+      ArrayList allScoresSorted = new ArrayList(new TreeSet(pairsPerScore.keySet()));
+      Collections.reverse(allScoresSorted);
+      Set<Integer> spec0PeakUsed = new HashSet<Integer>();
+      Set<Integer> spec1PeakUsed = new HashSet<Integer>();
+      double totalScore = 0.0;
+      for (int i = 0; i < allScoresSorted.size(); i++) {
+          double score = (double) allScoresSorted.get(i);
+          Set<List<Integer>> scorePairs = pairsPerScore.get(score);
+          Iterator<List<Integer>> it = scorePairs.iterator();
+          while (it.hasNext()) {
+              List<Integer> pair = it.next();
+              int i0 = pair.get(0);
+              int i1 = pair.get(1);
+              if (!spec0PeakUsed.contains(i0) && !spec1PeakUsed.contains(i1)) {
+                  spec0PeakUsed.add(i0);
+                  spec1PeakUsed.add(i1);
+                  totalScore += score;
+                  product++;
+              }
+          }
+      }
+      if(mode == 0){
+          return product/((magnitude+magnitude2)/2);
+      }else if(mode == 1){
+            return product/magnitude;
+      }else{
+            return product/magnitude2;
+      }
   }
   
-  public double projectedCosine(Spectrum s1)
+  public double projectedCosine(Spectrum s1, double tolerance)
   {
-    double product = 0.0D;
-    double magnitude = magnitude();
-    
-    double projectedNorm = 1.0E-8D;
-    
-    int i = 0;int j = 0;
-    while ((i < this.peaks.size()) && (j < s1.peaks.size()))
-    {
-      double mz1 = ((Peak)this.peaks.get(i)).getMass();
-      double mz2 = ((Peak)s1.peaks.get(j)).getMass();
-      if (mz1 < mz2)
-      {
-        i++;
+      if (s1.peaks.size() == 0 || this.peaks.size() == 0) {
+          return 0.0;
       }
-      else if (mz1 == mz2)
-      {
-        product = product + ((Peak)this.peaks.get(i)).getIntensity() * ((Peak)s1.peaks.get(j)).getIntensity();
-        projectedNorm += ((Peak)s1.peaks.get(j)).getIntensity() * ((Peak)s1.peaks.get(j)).getIntensity();
-        i++;
-        j++;
+      double magnitude = this.magnitude();
+      double projectedNorm = 0.00000001;
+      double shift = this.parentMass - s1.parentMass;
+      Set<List<Integer>> zeroShiftAlignments = this.findMatchPeaks(s1, 0, tolerance);
+      Set<List<Integer>> realShiftAlignments;
+      if (Math.abs(shift) > tolerance) {
+          //realShiftAlignments = this.findMatchPeaks(s1, shift, tolerance); 
       }
-      else
-      {
-        j++;
+      else {
+          realShiftAlignments = new HashSet<List<Integer>>();
       }
-    }
-    magnitude *= Math.pow(projectedNorm, 0.5D);
-    return product / magnitude;
+      HashMap<Double, Set<List<Integer>>> pairsPerScore = new HashMap<Double, Set<List<Integer>>>();
+      updatePairsPerScoreMap(pairsPerScore, zeroShiftAlignments, s1);
+      //updatePairsPerScoreMap(pairsPerScore, realShiftAlignments, s1);
+      ArrayList allScoresSorted = new ArrayList(new TreeSet(pairsPerScore.keySet()));
+      Collections.reverse(allScoresSorted);
+      Set<Integer> spec0PeakUsed = new HashSet<Integer>();
+      Set<Integer> spec1PeakUsed = new HashSet<Integer>();
+      double totalScore = 0.0;
+      for (int i = 0; i < allScoresSorted.size(); i++) {
+          double score = (double) allScoresSorted.get(i);
+          Set<List<Integer>> scorePairs = pairsPerScore.get(score);
+          Iterator<List<Integer>> it = scorePairs.iterator();
+          while (it.hasNext()) {
+              List<Integer> pair = it.next();
+              int i0 = pair.get(0);
+              int i1 = pair.get(1);
+              if (!spec0PeakUsed.contains(i0) && !spec1PeakUsed.contains(i1)) {
+                  spec0PeakUsed.add(i0);
+                  spec1PeakUsed.add(i1);
+                  totalScore += score;
+                  projectedNorm += s1.peaks.get(i1).getIntensity() * s1.peaks.get(i1).getIntensity();
+              }
+          }
+      }
+      magnitude = magnitude * Math.pow(projectedNorm, 0.5);
+      return totalScore / magnitude;
   }
   
-  public double projectedCosine1(Spectrum s1)
+  public double projectedCosine1(Spectrum s1, double tolerance)
   {
-    double product = 0.0D;
-    double magnitude = sumOfPeaks();
-    
-    double projectedNorm = 1.0E-8D;
-    
-    int i = 0;int j = 0;
-    while ((i < this.peaks.size()) && (j < s1.peaks.size()))
-    {
-      double mz1 = ((Peak)this.peaks.get(i)).getMass();
-      double mz2 = ((Peak)s1.peaks.get(j)).getMass();
-      if (mz1 < mz2)
-      {
-        i++;
+      if (s1.peaks.size() == 0 || this.peaks.size() == 0) {
+          return 0.0;
       }
-      else if (mz1 == mz2)
-      {
-        product = product + Math.pow(((Peak)this.peaks.get(i)).getIntensity() * ((Peak)s1.peaks.get(j)).getIntensity(), 0.5D);
-        projectedNorm += ((Peak)s1.peaks.get(j)).getIntensity();
-        i++;
-        j++;
+      double magnitude = this.sumOfPeaks();
+      double projectedNorm = 0.00000001;
+      double shift = this.parentMass - s1.parentMass;
+      Set<List<Integer>> zeroShiftAlignments = this.findMatchPeaks(s1, 0, tolerance);
+      Set<List<Integer>> realShiftAlignments;
+      if (Math.abs(shift) > tolerance) {
+          //realShiftAlignments = this.findMatchPeaks(s1, shift, tolerance); 
       }
-      else
-      {
-        j++;
+      else {
+          realShiftAlignments = new HashSet<List<Integer>>();
       }
-    }
-    magnitude *= Math.pow(projectedNorm, 0.5D);
-    return product / magnitude;
+      HashMap<Double, Set<List<Integer>>> pairsPerScore = new HashMap<Double, Set<List<Integer>>>();
+      updatePairsPerScoreMap3(pairsPerScore, zeroShiftAlignments, s1);
+      //updatePairsPerScoreMap3(pairsPerScore, realShiftAlignments, s1);
+      ArrayList allScoresSorted = new ArrayList(new TreeSet(pairsPerScore.keySet()));
+      Collections.reverse(allScoresSorted);
+      Set<Integer> spec0PeakUsed = new HashSet<Integer>();
+      Set<Integer> spec1PeakUsed = new HashSet<Integer>();
+      double totalScore = 0.0;
+      for (int i = 0; i < allScoresSorted.size(); i++) {
+          double score = (double) allScoresSorted.get(i);
+          Set<List<Integer>> scorePairs = pairsPerScore.get(score);
+          Iterator<List<Integer>> it = scorePairs.iterator();
+          while (it.hasNext()) {
+              List<Integer> pair = it.next();
+              int i0 = pair.get(0);
+              int i1 = pair.get(1);
+              if (!spec0PeakUsed.contains(i0) && !spec1PeakUsed.contains(i1)) {
+                  spec0PeakUsed.add(i0);
+                  spec1PeakUsed.add(i1);
+                  totalScore += score;
+                  projectedNorm += s1.peaks.get(i1).getIntensity();
+              }
+          }
+      }
+      magnitude = magnitude * Math.pow(projectedNorm, 0.5);
+      return totalScore / magnitude;
   }
   
-  public double alpha(Spectrum a, Spectrum b)
+  public double alpha(Spectrum a, Spectrum b, double fragmentTolerance)
   {
-    double C = dot(a);
-    double D = a.dot(b);
-    double E = dot(b);
-    double A = a.dot(a);
-    double B = b.dot(b);
+    double C = dot(a, fragmentTolerance);
+    double D = a.dot(b, fragmentTolerance);
+    double E = dot(b, fragmentTolerance);
+    double A = a.dot(a, fragmentTolerance);
+    double B = b.dot(b, fragmentTolerance);
     double alpha = (B * C - D * E) / (A * E - C * D);
     if ((alpha < 0.1D) || (alpha > 10.0D) || (Double.isNaN(alpha))) {
       return 0.1D;
@@ -1013,17 +1036,17 @@ public class Spectrum
     return alpha;
   }
   
-  public double maxScore(Spectrum a, Spectrum b, double alpha)
+  public double maxScore(Spectrum a, Spectrum b, double alpha, double fragmentTolerance)
   {
     alpha = Math.pow(alpha, 0.5D);
-    Spectrum answerMix1 = new Spectrum(a, b, alpha, 1.0D);
-    Spectrum answerMix2 = new Spectrum(b, a, alpha, 1.0D);
+    Spectrum answerMix1 = new Spectrum(a, b, alpha, 1.0D, fragmentTolerance);
+    Spectrum answerMix2 = new Spectrum(b, a, alpha, 1.0D, fragmentTolerance);
     
-    Spectrum baseAnswer = new Spectrum(a, b, 1.0D, 0.1D);
+    Spectrum baseAnswer = new Spectrum(a, b, 1.0D, 0.1D, fragmentTolerance);
     
-    double score1 = cosineSim(answerMix1);
-    double score2 = cosineSim(answerMix2);
-    double score = cosineSim(baseAnswer);
+    double score1 = cosineSim(answerMix1, fragmentTolerance);
+    double score2 = cosineSim(answerMix2, fragmentTolerance);
+    double score = cosineSim(baseAnswer, fragmentTolerance);
     if ((score1 > score2) && (score1 > score)) {
       return score1;
     }
@@ -1033,7 +1056,7 @@ public class Spectrum
     return score;
   }
   
-  public double shiftMaxScore(Spectrum a, Spectrum b, double alpha)
+  public double shiftMaxScore(Spectrum a, Spectrum b, double alpha, double fragmentTolerance)
   {
     Spectrum origA = a.toNormVector();
     a.shiftSpectrum(0.5D);
@@ -1050,38 +1073,38 @@ public class Spectrum
     Spectrum mix = toNormVector();
     
     double best = 0.0D;
-    alpha = mix.alpha(origA, origB);
-    best = Math.max(best, mix.maxScore(origA, origB, alpha));
-    alpha = mix.alpha(origA, leftB);
-    best = Math.max(best, mix.maxScore(origA, leftB, alpha));
-    alpha = mix.alpha(origA, rightB);
-    best = Math.max(best, mix.maxScore(origA, rightB, alpha));
+    alpha = mix.alpha(origA, origB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(origA, origB, alpha, fragmentTolerance));
+    alpha = mix.alpha(origA, leftB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(origA, leftB, alpha, fragmentTolerance));
+    alpha = mix.alpha(origA, rightB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(origA, rightB, alpha, fragmentTolerance));
     
-    alpha = mix.alpha(leftA, origB);
-    best = Math.max(best, mix.maxScore(leftA, origB, alpha));
-    alpha = mix.alpha(leftA, leftB);
-    best = Math.max(best, mix.maxScore(leftA, leftB, alpha));
-    alpha = mix.alpha(leftA, rightB);
-    best = Math.max(best, mix.maxScore(leftA, rightB, alpha));
+    alpha = mix.alpha(leftA, origB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(leftA, origB, alpha, fragmentTolerance));
+    alpha = mix.alpha(leftA, leftB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(leftA, leftB, alpha, fragmentTolerance));
+    alpha = mix.alpha(leftA, rightB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(leftA, rightB, alpha, fragmentTolerance));
     
-    alpha = mix.alpha(rightA, origB);
-    best = Math.max(best, mix.maxScore(rightA, origB, alpha));
-    alpha = mix.alpha(rightA, leftB);
-    best = Math.max(best, mix.maxScore(rightA, leftB, alpha));
-    alpha = mix.alpha(rightA, rightB);
-    best = Math.max(best, mix.maxScore(rightA, rightB, alpha));
+    alpha = mix.alpha(rightA, origB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(rightA, origB, alpha, fragmentTolerance));
+    alpha = mix.alpha(rightA, leftB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(rightA, leftB, alpha, fragmentTolerance));
+    alpha = mix.alpha(rightA, rightB, fragmentTolerance);
+    best = Math.max(best, mix.maxScore(rightA, rightB, alpha, fragmentTolerance));
     
     return best;
   }
   
-  public double inverseMaxScore(Spectrum a, Spectrum b, double alpha)
+  public double inverseMaxScore(Spectrum a, Spectrum b, double alpha, double fragmentTolerance)
   {
-    Spectrum answerMix = new Spectrum(a, b);
+    Spectrum answerMix = new Spectrum(a, b, fragmentTolerance);
     Spectrum mix = toNormVector();
     
     mix.upscale(a, b, alpha);
     
-    return mix.cosineSim(answerMix);
+    return mix.cosineSim(answerMix, fragmentTolerance);
   }
   
   public void upscale(Spectrum s1, Spectrum s2, double alpha)
@@ -1136,31 +1159,44 @@ public class Spectrum
     }
   }
   
-  public double dot(Spectrum s1)
+  public double dot(Spectrum s1, double tolerance)
   {
-    double product = 0.0D;
-    
-    int i = 0;int j = 0;
-    while ((i < this.peaks.size()) && (j < s1.peaks.size()))
-    {
-      double mz1 = ((Peak)this.peaks.get(i)).getMass();
-      double mz2 = ((Peak)s1.peaks.get(j)).getMass();
-      if (mz1 < mz2)
-      {
-        i++;
+      if (s1.peaks.size() == 0 || this.peaks.size() == 0) {
+          return 0.0;
       }
-      else if (mz1 == mz2)
-      {
-        product = product + Math.pow(((Peak)this.peaks.get(i)).getIntensity(), 2.0D) * Math.pow(((Peak)s1.peaks.get(j)).getIntensity(), 2.0D);
-        i++;
-        j++;
+      double shift = this.parentMass - s1.parentMass;
+      Set<List<Integer>> zeroShiftAlignments = this.findMatchPeaks(s1, 0, tolerance);
+      Set<List<Integer>> realShiftAlignments;
+      if (Math.abs(shift) > tolerance) {
+          //realShiftAlignments = this.findMatchPeaks(s1, shift, tolerance); 
       }
-      else
-      {
-        j++;
+      else {
+          realShiftAlignments = new HashSet<List<Integer>>();
       }
-    }
-    return product;
+      HashMap<Double, Set<List<Integer>>> pairsPerScore = new HashMap<Double, Set<List<Integer>>>();
+      updatePairsPerScoreMap2(pairsPerScore, zeroShiftAlignments, s1);
+      //updatePairsPerScoreMap2(pairsPerScore, realShiftAlignments, s1);
+      ArrayList allScoresSorted = new ArrayList(new TreeSet(pairsPerScore.keySet()));
+      Collections.reverse(allScoresSorted);
+      Set<Integer> spec0PeakUsed = new HashSet<Integer>();
+      Set<Integer> spec1PeakUsed = new HashSet<Integer>();
+      double totalScore = 0.0;
+      for (int i = 0; i < allScoresSorted.size(); i++) {
+          double score = (double) allScoresSorted.get(i);
+          Set<List<Integer>> scorePairs = pairsPerScore.get(score);
+          Iterator<List<Integer>> it = scorePairs.iterator();
+          while (it.hasNext()) {
+              List<Integer> pair = it.next();
+              int i0 = pair.get(0);
+              int i1 = pair.get(1);
+              if (!spec0PeakUsed.contains(i0) && !spec1PeakUsed.contains(i1)) {
+                  spec0PeakUsed.add(i0);
+                  spec1PeakUsed.add(i1);
+                  totalScore += score;
+              }
+          }
+      }
+      return totalScore;
   }
   
   public void removeSharePeaks(Spectrum s)
@@ -1229,68 +1265,92 @@ public class Spectrum
     this.peaks.removeAll(toBeRemoved);
   }
   
-  public double residual(Spectrum s)
+  public double residual(Spectrum s, double tolerance)
   {
-    Iterator<Peak> p1 = this.peaks.iterator();
-    Iterator<Peak> p2 = s.getPeak().iterator();
-    Peak peak1 = null;Peak peak2 = null;
-    int exp = 4;
-    
-    double shareIntensity = 0.0D;
-    double residIntensity = 0.001D;
-    if ((p1.hasNext()) && (p2.hasNext()))
-    {
-      peak1 = (Peak)p1.next();
-      peak2 = (Peak)p2.next();
-    }
-    while ((p1.hasNext()) && (p2.hasNext())) {
-      if (peak1.getMass() < peak2.getMass())
-      {
-        residIntensity += Math.pow(peak1.getIntensity(), exp);
-        
-        peak1 = (Peak)p1.next();
-      }
-      else if (peak1.getMass() == peak2.getMass())
-      {
-        double remain = peak1.getIntensity() - peak2.getIntensity();
-        if (remain < 0.0D) {
-          remain = 0.0D;
+        Iterator<Peak> p1 = this.peaks.iterator();
+        Iterator<Peak> p2 = s.getPeak().iterator();
+        Peak peak1 = null, peak2 = null;
+        int exp = 4;
+//      if(this.isSqrtTrans){
+//          exp = 4;
+//      }else{
+//          exp = 2;
+//      }
+        double shareIntensity = 0;
+        double residIntensity = 0.001; //avoid div-by-zero 
+        if(p1.hasNext() && p2.hasNext()){
+            peak1 = p1.next();
+            peak2 = p2.next();
+        }else{
+            return shareIntensity/residIntensity;
         }
-        shareIntensity += Math.pow(peak1.getIntensity(), exp);
+        double remain;
+        //System.out.println("magnitude is: " + this.magnitude());
+        while(p1.hasNext() && p2.hasNext()){
+            if(Math.abs(peak1.getMass() - peak2.getMass()) <= tolerance){
+                remain = peak1.getIntensity() - peak2.getIntensity();
+                if(remain < 0){
+                    remain = 0;
+                }
+                shareIntensity += Math.pow(peak1.getIntensity(),exp);
+                //System.out.println("share: " + peak2.getMass() + "\t" + peak2.getIntensity());
+                //System.out.println("remaining: " + peak1.getMass() + "\t" + remain);
+                //residIntensity += Math.pow(remain,exp);
+                peak1 = p1.next();
+                peak2 = p2.next();
+            }
+            else if(peak1.getMass() < peak2.getMass()){
+                residIntensity += Math.pow(peak1.getIntensity(),exp);
+                //System.out.println("res intensity: " + peak1.getMass() + "\t" + peak1.getIntensity());
+                peak1 = p1.next();
+            }else{
+                //shareIntensity += Math.pow(peak1.getIntensity(), 2);
+                peak2 = p2.next();
+            }
+        }
         
-        peak1 = (Peak)p1.next();
-        peak2 = (Peak)p2.next();
-      }
-      else
-      {
-        peak2 = (Peak)p2.next();
-      }
-    }
-    if (peak1.getMass() == peak2.getMass())
-    {
-      shareIntensity += Math.pow(peak1.getIntensity(), exp);
-      double remain = peak1.getIntensity() - peak2.getIntensity();
-      if (remain < 0.0D) {
-        remain = 0.0D;
-      }
-    }
-    if (!p1.hasNext()) {
-      residIntensity += Math.pow(peak1.getIntensity(), exp);
-    }
-    while (p1.hasNext()) {
-      residIntensity += Math.pow(((Peak)p1.next()).getIntensity(), exp);
-    }
-    double alpha = Math.pow(residIntensity, 0.5D);
-    
-    alpha = alpha * alpha / (1.0D - alpha * alpha);
-    alpha = Math.pow(alpha, 0.5D);
-    if (alpha > 1.0D) {
-      return 1.0D / alpha;
-    }
-    return alpha;
+        if(Math.abs(peak1.getMass() - peak2.getMass()) < tolerance){ //take care of last element
+                shareIntensity += Math.pow(peak1.getIntensity(), exp);
+                remain = peak1.getIntensity() - peak2.getIntensity();
+                if(remain < 0){
+                    remain = 0;
+                }
+                //residIntensity += Math.pow(remain, 2);
+        }
+        if(!p1.hasNext()){
+            residIntensity += Math.pow(peak1.getIntensity(), exp);
+        }
+        
+//      if(!p2.hasNext()){
+//          shareIntensity += Math.pow(peak2.getIntensity(), 2);
+//          //System.out.println("share: " + peak2.getMass() + "\t" + peak2.getIntensity());
+//      }
+        
+        while(p1.hasNext()){
+            residIntensity += Math.pow(p1.next().getIntensity(), exp);
+        }
+        
+//      while(p2.hasNext()){
+//          shareIntensity += Math.pow(p2.next().getIntensity(), 2);
+//      }
+            
+        //System.out.println("shareIntensity: " + Math.pow(shareIntensity,0.5));
+//      System.out.println("s has intensity: " + s.magnitude());
+        //System.out.println("resIntensity: " + Math.pow(residIntensity,0.5));
+        //double alpha = Math.pow(shareIntensity/residIntensity, 0.5); //initial estimate
+        double alpha = Math.pow(residIntensity, 0.5);
+        //System.out.println("alpha: " + alpha);
+        alpha = alpha*alpha / (1-alpha*alpha);  //reestimate by taking into account that mixture is normalized to one
+        alpha =  Math.pow(alpha, 0.5); //thus each component is down-weighted slightly
+        if(alpha > 1.0){
+            return 1/alpha;
+        }else{
+            return alpha;
+        }
+//return alpha;
   }
   
-  public void subtractSharePeaks(Spectrum s)
+  public void subtractSharePeaks(Spectrum s, double tolerance)
   {
     Iterator<Peak> p1 = this.peaks.iterator();
     Iterator<Peak> p2 = s.getPeak().iterator();
@@ -1301,25 +1361,25 @@ public class Spectrum
       peak2 = (Peak)p2.next();
     }
     while ((p1.hasNext()) && (p2.hasNext())) {
-      if (peak1.getMass() < peak2.getMass())
-      {
-        peak1 = (Peak)p1.next();
-      }
-      else if (peak1.getMass() == peak2.getMass())
-      {
-        peak1.setIntensity(peak1.getIntensity() - peak2.getIntensity());
-        if (peak1.getIntensity() < 0.0D) {
-          p1.remove();
+        if (Math.abs(peak1.getMass() - peak2.getMass()) <= tolerance)
+        {
+          peak1.setIntensity(peak1.getIntensity() - peak2.getIntensity());
+          if (peak1.getIntensity() < 0.0D) {
+            p1.remove();
+          }
+          peak1 = (Peak)p1.next();
+          peak2 = (Peak)p2.next();
         }
+       else if (peak1.getMass() < peak2.getMass())
+      {
         peak1 = (Peak)p1.next();
-        peak2 = (Peak)p2.next();
       }
       else
       {
         peak2 = (Peak)p2.next();
       }
     }
-    if (peak1.getMass() == peak2.getMass()) {
+    if (Math.abs(peak1.getMass() - peak2.getMass()) <= tolerance) {
       p1.remove();
     }
   }
@@ -1678,7 +1738,7 @@ public class Spectrum
     testReadMGF();
     testtoVector();
     testVectorRep();
-    testMixSpect();
+    testMixSpect(.5);
     testRemoveSharePeak();
     testPeakCount();
     
@@ -1712,20 +1772,20 @@ public class Spectrum
     Spectrum msms2 = new Spectrum();
     msms2.readSpectrumFromMGF(filename);
     System.out.println("Comparing self to self: " + 
-      msms2.cosineSim(msms));
+      msms2.cosineSim(msms, .5));
     
     msms = msms.toNormVector(0.5D, 100.0D, 500.0D);
     msms2 = msms2.toNormVector(0.5D, 100.0D, 500.0D);
     System.out.println("Comparing self to self: " + 
-      msms2.cosineSim(msms));
+      msms2.cosineSim(msms, .5));
     System.out.println("scaling one copy of self");
     msms.scaleSpectrum(0.03D);
     System.out.println("Comparing self to self: " + 
-      msms2.cosineSim(msms));
+      msms2.cosineSim(msms, .5));
     System.out.println();
   }
   
-  public static void testMixSpect()
+  public static void testMixSpect(double fragmentTolerance)
   {
     System.out.println("generating mix spectrum");
     String filename = "testspectrum.mgf";
@@ -1733,18 +1793,18 @@ public class Spectrum
     s1.readSpectrumFromMGF("testspectrum.mgf");
     Spectrum s2 = new Spectrum();
     s2.readSpectrumFromMGF("testspectrum2.mgf");
-    Spectrum msms12 = new Spectrum(s1, s2);
+    Spectrum msms12 = new Spectrum(s1, s2, fragmentTolerance);
     s1 = s1.toNormVector();
     s2 = s2.toNormVector();
     System.out.println(s1);
     System.out.println(s2);
     System.out.println(msms12);
-    System.out.println("cosine: " + s2.cosineSim(msms12));
-    System.out.println("projected: " + s2.projectedCosine(msms12));
-    System.out.println("cosine: " + s1.cosineSim(msms12));
-    System.out.println("projected: " + s1.projectedCosine(msms12));
-    System.out.println("distinct: " + s1.cosineSim(s2));
-    System.out.println("distinct projected: " + s1.projectedCosine(s2));
+    System.out.println("cosine: " + s2.cosineSim(msms12, .5));
+    System.out.println("projected: " + s2.projectedCosine(msms12, fragmentTolerance));
+    System.out.println("cosine: " + s1.cosineSim(msms12, .5));
+    System.out.println("projected: " + s1.projectedCosine(msms12, fragmentTolerance));
+    System.out.println("distinct: " + s1.cosineSim(s2, .5));
+    System.out.println("distinct projected: " + s1.projectedCosine(s2, fragmentTolerance));
   }
   
   public static void testRemoveSharePeak()
@@ -1807,6 +1867,7 @@ public class Spectrum
   
   public static void testShiftCosine()
   {
+    double fragmentTolerance = .5;
     String filename = ".\\mixture_compressed\\new80min.mgf";
     String fileMix = ".\\mixture_compressed\\new2min.mgf";
     SpectrumLib lib1 = new SpectrumLib(filename, "MGF");
@@ -1814,17 +1875,17 @@ public class Spectrum
     Spectrum s = (Spectrum)lib1.getSpectra("spec_3182.dta..1").get(0);
     Spectrum m = (Spectrum)mixlib.getSpectra("spec_186.dta..1").get(0);
     Spectrum sCopy = s;
-    System.out.println("shift cosine: " + s.shiftCosineSim(m));
-    System.out.println("shift cosine: " + s.shiftCosineSim(m));
-    System.out.println("shift cosine: " + m.shiftCosineSim(s));
+    System.out.println("shift cosine: " + s.shiftCosineSim(m, fragmentTolerance));
+    System.out.println("shift cosine: " + s.shiftCosineSim(m, fragmentTolerance));
+    System.out.println("shift cosine: " + m.shiftCosineSim(s, fragmentTolerance));
     System.out.println("");
-    System.out.println("shift cosine with self: " + s.shiftCosineSim(sCopy));
-    System.out.println("shift cosine with self: " + sCopy.shiftCosineSim(s));
+    System.out.println("shift cosine with self: " + s.shiftCosineSim(sCopy, fragmentTolerance));
+    System.out.println("shift cosine with self: " + sCopy.shiftCosineSim(s, fragmentTolerance));
     System.out.println("");
     s = s.toNormVector();
     sCopy = sCopy.toNormVector();
-    System.out.println("cosine: " + s.cosineSim(sCopy));
-    System.out.println("cosine: " + sCopy.cosineSim(s));
+    System.out.println("cosine: " + s.cosineSim(sCopy, fragmentTolerance));
+    System.out.println("cosine: " + sCopy.cosineSim(s, fragmentTolerance));
   }
   
   private class peakComparator
@@ -1843,4 +1904,158 @@ public class Spectrum
       return -1;
     }
   }
+  
+  public double cosineSim(Spectrum s1, double tolerance) {
+      if (s1.peaks.size() == 0 || this.peaks.size() == 0) {
+          return 0.0;
+      }
+      double magnitude = this.magnitude();
+      magnitude *= s1.magnitude();
+      double shift = this.parentMass - s1.parentMass;
+      Set<List<Integer>> zeroShiftAlignments = this.findMatchPeaks(s1, 0, tolerance);
+      Set<List<Integer>> realShiftAlignments;
+      if (Math.abs(shift) > tolerance) {
+          //realShiftAlignments = this.findMatchPeaks(s1, shift, tolerance); 
+      }
+      else {
+          realShiftAlignments = new HashSet<List<Integer>>();
+      }
+      HashMap<Double, Set<List<Integer>>> pairsPerScore = new HashMap<Double, Set<List<Integer>>>();
+      updatePairsPerScoreMap(pairsPerScore, zeroShiftAlignments, s1);
+      //updatePairsPerScoreMap(pairsPerScore, realShiftAlignments, s1);
+      ArrayList allScoresSorted = new ArrayList(new TreeSet(pairsPerScore.keySet()));
+      Collections.reverse(allScoresSorted);
+      Set<Integer> spec0PeakUsed = new HashSet<Integer>();
+      Set<Integer> spec1PeakUsed = new HashSet<Integer>();
+      double totalScore = 0.0;
+      for (int i = 0; i < allScoresSorted.size(); i++) {
+          double score = (double) allScoresSorted.get(i);
+          Set<List<Integer>> scorePairs = pairsPerScore.get(score);
+          Iterator<List<Integer>> it = scorePairs.iterator();
+          while (it.hasNext()) {
+              List<Integer> pair = it.next();
+              int i0 = pair.get(0);
+              int i1 = pair.get(1);
+              if (!spec0PeakUsed.contains(i0) && !spec1PeakUsed.contains(i1)) {
+                  spec0PeakUsed.add(i0);
+                  spec1PeakUsed.add(i1);
+                  totalScore += score;
+              }
+          }
+      }
+      return totalScore / magnitude;
+  }
+  
+  public void updatePairsPerScoreMap(
+          HashMap<Double, Set<List<Integer>>> pairsPerScore, Set<List<Integer>> alignments, Spectrum s1
+  ) {
+      Iterator<List<Integer>> it = alignments.iterator();
+      while(it.hasNext()) {
+          List<Integer> l = it.next();
+          int i0 = l.get(0);
+          int i1 = l.get(1);
+          double score = this.peaks.get(i0).getIntensity() * s1.peaks.get(i1).getIntensity();
+          Set<List<Integer>> currVal;
+          if (pairsPerScore.containsKey(score)) {
+              currVal = pairsPerScore.get(score);
+          }
+          else {
+              currVal = new HashSet<List<Integer>>();
+          }
+          currVal.add(l);
+          pairsPerScore.put(score, currVal);
+      }
+  }
+  
+  public void updatePairsPerScoreMap1(
+          HashMap<Double, Set<List<Integer>>> pairsPerScore, Set<List<Integer>> alignments, Spectrum s1
+  ) {
+      Iterator<List<Integer>> it = alignments.iterator();
+      while(it.hasNext()) {
+          List<Integer> l = it.next();
+          int i0 = l.get(0);
+          int i1 = l.get(1);
+          double score = Math.pow(this.peaks.get(i0).getIntensity(), .5) * Math.pow(s1.peaks.get(i1).getIntensity(), .5);
+          Set<List<Integer>> currVal;
+          if (pairsPerScore.containsKey(score)) {
+              currVal = pairsPerScore.get(score);
+          }
+          else {
+              currVal = new HashSet<List<Integer>>();
+          }
+          currVal.add(l);
+          pairsPerScore.put(score, currVal);
+      }
+  }
+  
+  public void updatePairsPerScoreMap2(
+          HashMap<Double, Set<List<Integer>>> pairsPerScore, Set<List<Integer>> alignments, Spectrum s1
+  ) {
+      Iterator<List<Integer>> it = alignments.iterator();
+      while(it.hasNext()) {
+          List<Integer> l = it.next();
+          int i0 = l.get(0);
+          int i1 = l.get(1);
+          double score = Math.pow(this.peaks.get(i0).getIntensity(), 2) * Math.pow(s1.peaks.get(i1).getIntensity(), 2);
+          Set<List<Integer>> currVal;
+          if (pairsPerScore.containsKey(score)) {
+              currVal = pairsPerScore.get(score);
+          }
+          else {
+              currVal = new HashSet<List<Integer>>();
+          }
+          currVal.add(l);
+          pairsPerScore.put(score, currVal);
+      }
+  }
+ 
+  public void updatePairsPerScoreMap3(
+          HashMap<Double, Set<List<Integer>>> pairsPerScore, Set<List<Integer>> alignments, Spectrum s1
+  ) {
+      Iterator<List<Integer>> it = alignments.iterator();
+      while(it.hasNext()) {
+          List<Integer> l = it.next();
+          int i0 = l.get(0);
+          int i1 = l.get(1);
+          double score = Math.pow(this.peaks.get(i0).getIntensity() * s1.peaks.get(i1).getIntensity(), .5);
+          Set<List<Integer>> currVal;
+          if (pairsPerScore.containsKey(score)) {
+              currVal = pairsPerScore.get(score);
+          }
+          else {
+              currVal = new HashSet<List<Integer>>();
+          }
+          currVal.add(l);
+          pairsPerScore.put(score, currVal);
+      }
+  }
+  
+  public Set<List<Integer>> findMatchPeaks(Spectrum s1, double shift, double tolerance) {
+     double adjTolerance =  tolerance + 0.000001;
+     int low = 0;
+     int high = 0;
+     Set<List<Integer>> matchPeaks = new HashSet<List<Integer>>();
+     for (int i = 0; i < this.peaks.size(); i++) {
+         Peak peak = this.peaks.get(i);
+         low = s1.peaks.size() - 1;
+         while (low > 0 && (peak.getMass() - adjTolerance) < (s1.peaks.get(low).getMass() + shift)) {
+            low--;
+         }
+         while (low < s1.peaks.size() && (peak.getMass() - adjTolerance) > (s1.peaks.get(low).getMass() + shift)){
+             low++;
+         }
+         while (high < s1.peaks.size() && (peak.getMass() + adjTolerance) >= (s1.peaks.get(high).getMass() + shift)) {
+             high++;
+         }
+         //return list of pairs of index of "this" peak, index of s1 peak
+         for (int j = low; j < high; j++) {
+             List<Integer> pair = new ArrayList<Integer>(2);
+             pair.add(i);
+             pair.add(j);
+             matchPeaks.add(pair);
+         }
+     }
+     return matchPeaks;
+  }
+  
 }
