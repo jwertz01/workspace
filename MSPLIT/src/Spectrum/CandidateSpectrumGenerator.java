@@ -135,6 +135,34 @@ public class CandidateSpectrumGenerator {
 //      }
         return candidates;
     }
+ 
+    /**
+     * Retrieve a list of spectra by the parentmass and charge of a query spectrum
+     * @param s
+     * @param tolerance
+     * @return
+     */
+    public List<Spectrum> getSpectraByMassAndCharge(Spectrum s, double tolerance){
+        int key = getKey(s.parentMass);
+        int width = (int)Math.ceil(tolerance);
+        List<Spectrum> candidates = new ArrayList();
+        for(int i = key-width; i <= key+width; i++){
+            Object value = getSpectraByMassAndCharge(i, s.charge);
+            if(value != null){
+                candidates.addAll(getSpectraByMassAndCharge(i, s.charge));
+            }
+        }
+//      this.avgTolerance = (19.0/20.0)*avgTolerance + (1/20.0)*tolerance; //keep track of a running tolerance for query
+//      //System.out.println("avg tolerance: " + this.avgTolerance);
+//      double ratio = Math.round(this.avgTolerance*2) / this.table.getKeepObjects();
+//      if(ratio > 10 || ratio < 0.1){
+//          this.table.setKeepObjects((int)Math.round(this.avgTolerance*2+1)*10);
+//          //System.out.println("changing cache:  " + (int)Math.round(this.avgTolerance*2+1)*10);
+//      }
+        return candidates;
+    }
+    
+    
     /**
      * 
      * @param mass
@@ -145,6 +173,25 @@ public class CandidateSpectrumGenerator {
         List<Spectrum> cand = (List<Spectrum>)this.table.get(key);
         return cand;
     }
+    
+    
+    /**
+     * 
+     * @param mass
+     * @return
+     */
+    public List<Spectrum> getSpectraByMassAndCharge(double mass, int charge){
+        int key = getKey(mass);
+        List<Spectrum> finalCand = new ArrayList<Spectrum>();
+        List<Spectrum> cand = (List<Spectrum>)this.table.get(key);
+        for (int i = 0; i < cand.size(); i++) {
+        		if (cand.get(i).charge == charge) {
+        			finalCand.add(cand.get(i));
+        		}
+        }
+        return finalCand;
+    }
+    
     
     /**
      *This provide a convenient static way to index spectral library
