@@ -2029,7 +2029,7 @@ public Spectrum filterAndSearch(Spectrum mix, double fragmentTolerance) {
      * @param resultFile
      * @return
      */
-    public static boolean runSearch(SpectrumLib lib, String mixtureLibFile, double parentMassTolerance, double massTolerance, String resultFile){
+    public static boolean runSearch(SpectrumLib lib, String mixtureLibFile, double parentMassTolerance, double massTolerance, String resultFile, int guessCharges){
         lib.scaleSpectrumMass(0.9995);
         lib.toNormVector(massTolerance*2, massTolerance,  2000);
         lib.normIntensity();
@@ -2079,7 +2079,12 @@ public Spectrum filterAndSearch(Spectrum mix, double fragmentTolerance) {
                 mixture = mixture.toNormVector(massTolerance*2, massTolerance, 2000);
                 mixture.sqrtSpectrum();
                 mixture = mixture.toNormVector(massTolerance*2, massTolerance, 2000);
-                lib.spectrumList = gen.getSpectraByMass(mixture, lib.parentMassTolerance);
+                if (guessCharges == 1) {
+                    lib.spectrumList = gen.getSpectraByMass(mixture, lib.parentMassTolerance);
+                }
+                else {
+                		lib.spectrumList = gen.getSpectraByMassAndCharge(mixture, lib.parentMassTolerance);
+                }
                 if(lib.spectrumList.size() < 1){
                     //System.out.println(mixture.spectrumName + "\t" + mixture.parentMass + "\t" + mixture.charge + "number of candidates: " + lib.spectrumList.size());
                     count++;
@@ -2114,8 +2119,8 @@ public Spectrum filterAndSearch(Spectrum mix, double fragmentTolerance) {
         return success > -1;
     }
     
-    public static boolean runSearch(SpectrumLib lib, String mixtureLibFile, double parentMassTolerance, String resultFile){
-        return runSearch(lib, mixtureLibFile, parentMassTolerance, 0.5, resultFile);
+    public static boolean runSearch(SpectrumLib lib, String mixtureLibFile, double parentMassTolerance, String resultFile, int guessCharges){
+        return runSearch(lib, mixtureLibFile, parentMassTolerance, 0.5, resultFile, guessCharges);
     }
     
     public static void runSearch(SpectrumLib lib, List<Spectrum> mixtureLib, double massTolerance, String resultFile, double parentMassTolerance){
@@ -2136,9 +2141,9 @@ public Spectrum filterAndSearch(Spectrum mix, double fragmentTolerance) {
     
 
     public static void main(String[] args){
-        if(args.length != 5){
+        if(args.length < 5){
             //System.err.println("java -jar MSPLIT.jar <library file> <query spectrum file> <precursor mass tolerance> <outputfile>");
-            throw new IllegalArgumentException("java -jar MSPLIT.jar <library file> <query spectrum file> <precursor mass tolerance> <ion tolerance> <outputfile>");
+            throw new IllegalArgumentException("java -jar MSPLIT.jar <library file> <query spectrum file> <precursor mass tolerance> <ion tolerance> <outputfile> [-guessCharges 0/1]");
             
         }else{
         //  args[0]= "../mixture_linked/MSPLIT_v1.0/test_Blibospec_libs/Acidiphilium_cryptum_JF-5.ms2";
@@ -2148,6 +2153,16 @@ public Spectrum filterAndSearch(Spectrum mix, double fragmentTolerance) {
             String filename = args[0];
             String fileMix = args[1];
             String fileout = args[4];
+            int guessCharges = 1;
+            if (args.length > 5) {
+            		String opt = args[5];
+            		if (opt.equalsIgnoreCase("-guessCharges") || opt.equalsIgnoreCase("-c")) {
+            			guessCharges = Integer.parseInt(args[6]);
+            		}
+            		else {
+            			throw new IllegalArgumentException("Unrecognized argument: " + args[5]);
+            		}
+            }
             SpectrumLib lib1 = null;
             double parentmassTol = 3;
             double fragmentTolerance = 0.5;
@@ -2181,7 +2196,7 @@ public Spectrum filterAndSearch(Spectrum mix, double fragmentTolerance) {
             }
             //lib1.scaleSpectrumMass(0.9995);
             lib1.outputFile = fileout;
-            if(!runSearch(lib1, fileMix, parentmassTol, fragmentTolerance, fileout)){
+            if(!runSearch(lib1, fileMix, parentmassTol, fragmentTolerance, fileout, guessCharges)){
                 System.err.println("Error occur during M-SPLIT searchess");
                 System.exit(1);
             }
