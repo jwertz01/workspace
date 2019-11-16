@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/pngencoder/pngencoder.jar"/>
 	<classpathentry kind="lib" path="lib/xerces/resolver.jar"/>
 	<classpathentry kind="lib" path="lib/xerces/xercesImpl.jar"/>
@@ -17,6 +16,7 @@
 	<classpathentry kind="lib" path="lib/jgoodies/binding-1.0rc3.jar"/>
 	<classpathentry kind="lib" path="lib/jgoodies/forms-1.0.5.jar"/>
 	<classpathentry kind="lib" path="lib/jgoodies/looks-1.3b1.jar"/>
-	<classpathentry kind="lib" path="/Users/wrtz/Desktop/misc/MzTabUtils.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/dependencies/MzTabUtils.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.launching.macosx.MacOSXType/Java SE 7 [1.7.0_80]"/>
 	<classpathentry kind="output" path="build"/>
 </classpath>

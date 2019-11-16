@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry excluding="org/Spectrums/MZMLReader.java|org/Spectrums/ProteinDigester.java|mixdb/SuffArrayTest.java|msgf/BacktrackTable.java|msgf/GeneratingFunction.java|msgf/ToolLauncher.java|msgf/AAFrequencyCounter.java|msgf/AminoAcidGraph.java|msgf/BacktrackPointer.java|msgf/DeNovoSequencer.java|msgf/FlexAminoAcidGraph.java|msgf/GeneratingFunctionGroup.java|msgf/GenericDeNovoGraph.java|msgf/GF.java|msgf/Histogram.java|msgf/IntHistogram.java|msgf/LengthPredictor.java|msgf/MSGFDBResultGenerator.java|msgf/MSGFResult.java|msgf/ProfileGF.java|org/Spectrums/LinkedRankBaseScoreLearner.java|org/Spectrums/LinkedSpectrumIonRankLearner.java" kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.launching.macosx.MacOSXType/Java SE 7 [1.7.0_80]"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/external_lib/biojava3-alignment-3.0.4.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/external_lib/biojava3-core-3.0.4.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/external_lib/biojava3-structure-3.0.4.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/external_lib/jdbm2/jdbm-2.4.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/external_lib/jmzml-1.6.7/jmzml-1.6.7.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/external_lib/colt.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/external_lib/commons-collections-3.2.1.jar"/>
+	<classpathentry kind="lib" path="/Users/wrtz/git/workspace/dependencies/jrap_StAX_v5.2.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/MixDB"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/Graph"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/biojava3-alignment-3.0.4.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/biojava3-core-3.0.4.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/biojava3-structure-3.0.4.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/jdbm2/jdbm-2.4.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/jmzml-1.6.7/jmzml-1.6.7.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/colt.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/external_lib/commons-collections-3.2.1.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Jian/workspace/MS_Java/msgfdb/extlib/jrap_StAX_v5.2.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/MS"/>
+	<classpathentry excluding="org/Spectrums/MZMLReader.java|org/Spectrums/ProteinDigester.java|mixdb/SuffArrayTest.java|msgf/BacktrackTable.java|msgf/GeneratingFunction.java|msgf/ToolLauncher.java|msgf/AAFrequencyCounter.java|msgf/AminoAcidGraph.java|msgf/BacktrackPointer.java|msgf/DeNovoSequencer.java|msgf/FlexAminoAcidGraph.java|msgf/GeneratingFunctionGroup.java|msgf/GenericDeNovoGraph.java|msgf/GF.java|msgf/Histogram.java|msgf/IntHistogram.java|msgf/LengthPredictor.java|msgf/MSGFDBResultGenerator.java|msgf/MSGFResult.java|msgf/ProfileGF.java|org/Spectrums/LinkedRankBaseScoreLearner.java|org/Spectrums/LinkedSpectrumIonRankLearner.java" kind="src" path="src"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

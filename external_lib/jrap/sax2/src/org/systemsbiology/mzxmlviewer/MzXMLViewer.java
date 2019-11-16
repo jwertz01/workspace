@@ -44,6 +44,8 @@ import org.systemsbiology.mzxmlviewer.menus.*;
 import org.systemsbiology.mzxmlviewer.tables.MzTableModel;
 import org.systemsbiology.mzxmlviewer.utilities.*;
 
+import com.lowagie.tools.SwingWorker;
+
 /**
  * MzXMLViewer is a simple viewer for mzXML files.
  * 

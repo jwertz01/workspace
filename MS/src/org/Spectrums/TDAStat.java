@@ -26,7 +26,7 @@ import UI.CommandLineParser;
  *
  */
 public class TDAStat{
-	private String resultFile;
+	protected String resultFile;
 	private int keyInd = 1;
 	private int scanInd = -1;
 	private int pepInd = 7;

@@ -37,6 +37,7 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Rectangle2D;
 import java.text.NumberFormat;
 import java.util.*;
+import java.util.Vector;
 
 import javax.swing.JPanel;
 
@@ -143,6 +144,12 @@ public class SpectrumComponent extends JPanel
 		public void setGroup(DatasetGroup group)
 		{
 			this.group = group;
+		}
+
+		@Override
+		public Comparable getSeriesKey(int arg0) {
+			// TODO Auto-generated method stub
+			return null;
 		}
 	}
 
