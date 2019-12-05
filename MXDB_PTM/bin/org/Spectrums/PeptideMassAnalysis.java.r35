@@ -22,7 +22,7 @@ public class PeptideMassAnalysis {
 	public static MassCalc initialize(){
 		mcalc = new MassCalc(SymbolPropertyTable.MONO_MASS, false);
 		try{
-			mcalc.setSymbolModification('C', 160.030648200); //modified mass
+			mcalc.setSymbolModification('C', 103.009184477); //modified mass
 		}catch(IllegalSymbolException e){
 			System.out.println("Symbol not valid");
 			System.out.println(e.getMessage());
