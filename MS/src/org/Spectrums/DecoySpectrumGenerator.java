@@ -80,7 +80,7 @@ public class DecoySpectrumGenerator
     d.parentMass = this.s.parentMass;
     d.rt = s.rt;
     Peptide pep = new Peptide(s.peptide, s.charge);
-    d.peptide = shufflePeptide(pep.getPeptide(), rand);
+    d.peptide = shufflePeptide(pep, s.getPeptide(), rand);
     Peptide decoyPep = new Peptide(d.peptide, s.charge);
     TheoreticalSpectrum.prefixIons = new String[] { "b", "b-H20", "b-NH3" };
     TheoreticalSpectrum.suffixIons = new String[] { "y", "y-H20", "y-NH3" };
@@ -123,13 +123,12 @@ public class DecoySpectrumGenerator
         } 
       } 
     } 
-    addUnannotatedPeaks(g, pList);
+    //addUnannotatedPeaks(g, pList);
     
     Collections.sort(pList, PeakMassComparator.comparator);
     d.setPeaks(pList);
     d.spectrumName = "DECOY_" + d.spectrumName;
     d.protein = "DECOY_" + s.protein;
-    
     return d;
   }
 
@@ -194,7 +193,7 @@ public class DecoySpectrumGenerator
       Peak p = (Peak)it.next();
       List neighs = g.getNeighbors(p);
       if (neighs.size() == 0) {
-        unAnnotated.add(p);
+        pList.add(p);
       }
     } 
   }
@@ -232,12 +231,14 @@ public class DecoySpectrumGenerator
    }
 
   
-  public String shufflePeptide(String pep, Random rand) { return shuffle(pep, rand); }
+  public String shufflePeptide(Peptide pep, String modified_pep, Random rand) { return shuffle(pep, modified_pep, rand); }
 
 
 
   
-  public String shuffle(String pep, Random rand) {
+  public String shuffle(Peptide pep_obj, String modified_pep, Random rand) {
+	String pep = pep_obj.getPeptide();
+	
     StringBuffer shuffle = new StringBuffer(pep);
     List<Integer> index = new ArrayList<Integer>();
     for (int i = 0; i < pep.length(); i++) {
@@ -245,20 +246,75 @@ public class DecoySpectrumGenerator
         index.add(Integer.valueOf(i));
       }
     } 
-    if (index.size() == 0) {
-      return pep;
+    
+    double nterm_mass = 0.0;
+    
+    // Shuffle corresponding mods along with amino acids
+    int[] pos = new int[pep_obj.getPos().length];
+    double[] masses = new double[pep_obj.getPtmmasses().length];
+    for (int i = 0; i < pos.length; i++) {
+    	// Is N-term
+    	if (
+    			(pep_obj.getPos()[i] == 1) &&
+    			(modified_pep.startsWith("+") || modified_pep.startsWith("-") || modified_pep.startsWith("["))
+    	) {
+    		nterm_mass = pep_obj.getPtmmasses()[i];
+    	}
+    	else {
+    		pos[i] = pep_obj.getPos()[i];
+    		masses[i] = pep_obj.getPtmmasses()[i];
+    	}
     }
-    for (int i = 0; i < 50; i++) {
-      
-      int j = rand.nextInt(index.size());
-      int k = rand.nextInt(index.size());
-      j = ((Integer)index.get(j)).intValue();
-      k = ((Integer)index.get(k)).intValue();
-      char c = shuffle.charAt(j);
-      shuffle.setCharAt(j, shuffle.charAt(k));
-      shuffle.setCharAt(k, c);
-    } 
-    return shuffle.toString();
+
+    if (index.size() != 0) {
+      for (int i = 0; i < 50; i++) {
+        int j = rand.nextInt(index.size());
+        int k = rand.nextInt(index.size());
+        j = ((Integer)index.get(j)).intValue();
+        k = ((Integer)index.get(k)).intValue();
+        char c = shuffle.charAt(j);
+     	for (int x = 0; x < pos.length; x++) {
+ 		  if (pos[x] - 1 == k) {
+ 			pos[x] = j + 1;
+ 		  }
+ 		  else if (pos[x] - 1 == j) {
+ 			pos[x] = k + 1;	
+ 	      }
+   	    }
+        shuffle.setCharAt(j, shuffle.charAt(k));
+        shuffle.setCharAt(k, c);
+        } 
+    }
+    
+    // add mods to peptide string
+    String outpepstr = "";
+    if (nterm_mass > 0) {
+    	outpepstr = "+" + Double.toString(nterm_mass);
+    }
+    else if (nterm_mass < 0) {
+    	outpepstr = Double.toString(nterm_mass);
+    }
+    for (int i = 0; i < shuffle.length(); i++) {
+    	int pos_index = -1;
+    	for (int j = 0; j < pos.length; j++) {
+    		if (i == pos[j] - 1) {
+    			pos_index = j;
+    		}
+    	}
+    	
+    	if (pos_index == -1) {
+    		outpepstr += shuffle.charAt(i);
+    	}
+    	else if (masses[pos_index] >= 0) {
+    		outpepstr += shuffle.charAt(i);
+    		outpepstr += "+" + masses[pos_index];
+    	}
+    	else {
+    		outpepstr += shuffle.charAt(i);
+    		outpepstr += masses[pos_index];
+    	}
+    }
+    return outpepstr;
   }
 
   
@@ -320,7 +376,7 @@ public class DecoySpectrumGenerator
         
         Spectrum target = generator.generateTarget(s);
         if (target.getPeak().size() >= 10) {
-          
+
           Spectrum decoy = generator.generateDecoy(s, rand);
           
           double sim = s.cosine(decoy, tolerance);
@@ -342,27 +398,25 @@ public class DecoySpectrumGenerator
             if (count > 50) {
               /* changed Nov. 2019: Instead of failing if didn't generate a decoy with low 
               / enough cosine, use the best decoy that didn't pass .65 threshold*/
-              //fail++;          
+              fail++;          
               //decoy = null;
               break;
             } 
           }
           
-          if (decoy == null) {
-            fail++;
-          }
-          else {
+          bo.write(target.toString());
             
-            bo.write(target.toString());
+          bo.write("\n");
             
-            bo.write("\n");
-            
-            bo.write(best_decoy);
-            bo.write("\n");
-          } 
+          bo.write(best_decoy);
+          bo.write("\n");
         } 
       } 
-      System.out.println("cannot generated decoy for " + fail + " spectra in the library");
+      //System.out.println("cannot generated decoy for " + fail + " spectra in the library");
+      System.out.println(
+    		  "Forced to create " + fail +
+    		  " decoy library spectra that were very similar to target (cosine > .65)"
+      );
       bo.flush();
       bo.close();
     }
