@@ -177,7 +177,7 @@ public class DecoySpectrumGenerator
         pList.add(theo);
       } 
     } 
-    addUnannotatedPeaks(g, pList);
+    //addUnannotatedPeaks(g, pList);
     
     Collections.sort(pList, PeakMassComparator.comparator);
     t.setPeaks(pList);
@@ -378,7 +378,7 @@ public class DecoySpectrumGenerator
         if (target.getPeak().size() >= 10) {
 
           Spectrum decoy = generator.generateDecoy(s, rand);
-          
+
           double sim = s.cosine(decoy, tolerance);
           int count = 0;
           String best_decoy = decoy.toString();
